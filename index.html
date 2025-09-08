@@ -84,6 +84,20 @@ function renderCalendar(){
     else if(count===2) day.classList.add('day-marked-2');
     else if(count>=3) day.classList.add('day-marked-3');
 
+    // Botão apagar dia
+    const btn = document.createElement('button');
+    btn.textContent = "Apagar";
+    btn.style.fontSize="10px";
+    btn.style.marginTop="2px";
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation(); // não ativa toque normal
+      markedDays[monthKey][i] = {count:0,note:""};
+      localStorage.setItem('markedDays', JSON.stringify(markedDays));
+      renderCalendar();
+    });
+    day.appendChild(btn);
+
+    // Toque curto/longo
     let timer,longPress=false;
     day.addEventListener('touchstart',()=>{
       longPress=false;
@@ -97,7 +111,6 @@ function renderCalendar(){
         renderCalendar();
       },500);
     });
-
     day.addEventListener('touchend',(e)=>{
       clearTimeout(timer);
       day.classList.remove('touch-show');
@@ -114,6 +127,18 @@ function renderCalendar(){
 
     calendar.appendChild(day);
   }
+
+  // Botão zerar mês
+  let resetBtn = document.createElement('button');
+  resetBtn.textContent = "Zerar Mês";
+  resetBtn.style.margin = "5px";
+  resetBtn.addEventListener('click', ()=>{
+    markedDays[monthKey] = {};
+    localStorage.setItem('markedDays', JSON.stringify(markedDays));
+    renderCalendar();
+  });
+  calendar.parentNode.insertBefore(resetBtn, calendar);
+
   renderStats();
 }
 
