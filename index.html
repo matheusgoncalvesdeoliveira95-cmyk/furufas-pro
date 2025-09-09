@@ -2,26 +2,72 @@
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Furufas Pro</title>
-<link rel="manifest" href="manifest.json">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Furufas">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Furufas Pro 🔥</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-  body { font-family: Arial,sans-serif; text-align:center; margin:5px; background:#fff0f5;}
-  h1 { color:#ff1493; font-size:24px; margin-bottom:10px; }
-  .calendar-header { display:flex; justify-content:center; gap:10px; margin-bottom:10px; }
-  button { padding:4px 8px; border:none; border-radius:5px; background:#ff69b4; color:white; cursor:pointer; }
-  .weekdays { display:grid; grid-template-columns:repeat(7,1fr); margin-bottom:8px; }
-  .weekdays div { font-size:12px; font-weight:bold; color:#333; }
-  .calendar { display:grid; grid-template-columns:repeat(7,1fr); gap:8px; }
-  .day { width:55px; height:55px; border-radius:10px; border:1px solid #ff69b4;
-         display:flex; justify-content:center; align-items:center; font-size:13px; background:#fff; cursor:pointer; flex-direction:column;}
+body {
+  font-family: Arial,sans-serif;
+  text-align:center;
+  margin:5px;
+  transition: background-color 0.5s;
+}
+h1 { color:#ff0000; font-size:24px; margin-bottom:5px; }
+#stats, #recompensa { font-size:16px; margin-bottom:5px; }
+.calendar-header {
+  display:flex;
+  justify-content:center;
+  gap:10px;
+  margin-bottom:5px;
+  flex-wrap:wrap;
+}
+.weekdays {
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  margin:8px 0;
+  font-weight:bold;
+  color:#990000;
+  font-size:14px;
+}
+.calendar {
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:8px;
+  justify-items:center;
+}
+.day {
+  width:50px;
+  height:50px;
+  border-radius:5px;
+  border:2px solid #ff0000;
+  cursor:pointer;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  flex-direction:column;
+  position:relative;
+  font-size:18px;
+  background:#ffcccc;
+}
+.delete-btn {
+  margin-top:4px;
+  font-size:12px;
+  padding:2px 4px;
+  background:#cc0000;
+  color:white;
+  border:none;
+  border-radius:4px;
+  cursor:pointer;
+}
+canvas { width: 100% !important; max-width: 100%; height: 150px; margin-top:15px;}
+button { font-size:14px; padding:5px 8px; border-radius:5px; border:none; background:#ff3333; color:#fff; cursor:pointer;}
 </style>
 </head>
 <body>
-<h1>Furufas Pro</h1>
+
+<h1>Furufas Pro 🔥</h1>
+<div id="stats"></div>
+<div id="recompensa"></div>
 <div class="calendar-header">
   <button id="prevMonth">&lt;</button>
   <div id="monthYear"></div>
@@ -31,36 +77,138 @@
   <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
 </div>
 <div class="calendar" id="calendar"></div>
-<script>
-let now=new Date();
-let markedDays=JSON.parse(localStorage.getItem('markedDays'))||{};
+<canvas id="chartDays"></canvas>
 
-const calendar=document.getElementById('calendar');
-const monthYear=document.getElementById('monthYear');
+<script>
+let now = new Date();
+let markedDays = JSON.parse(localStorage.getItem('markedDays'))||{};
+const calendar = document.getElementById('calendar');
+const stats = document.getElementById('stats');
+const recompensa = document.getElementById('recompensa');
+const monthYear = document.getElementById('monthYear');
+const prevMonthBtn = document.getElementById('prevMonth');
+const nextMonthBtn = document.getElementById('nextMonth');
+const chartCanvas = document.getElementById('chartDays');
+
+let currentMonth = now.getMonth();
+let currentYear = now.getFullYear();
+
+const emojiConfig = {1:'🍑💦', 2:'🍑🔥', 3:'💥🍆'};
+const monthThemes = [
+  {bg:'#fff0f5',day1:'#ffcccc',day2:'#ff6666',day3:'#cc0000'},
+  {bg:'#ffe4e1',day1:'#ffd1d1',day2:'#ff9999',day3:'#cc3366'},
+  {bg:'#ffe4b5',day1:'#ffecb3',day2:'#ffc107',day3:'#ff9800'},
+  {bg:'#e6e6fa',day1:'#dcdcff',day2:'#b3b3ff',day3:'#6666cc'},
+  {bg:'#f0fff0',day1:'#d0ffd0',day2:'#90ee90',day3:'#339933'},
+  {bg:'#f5f5dc',day1:'#fffacd',day2:'#f0e68c',day3:'#bdb76b'},
+  {bg:'#fafad2',day1:'#ffffe0',day2:'#ffff99',day3:'#cccc66'},
+  {bg:'#e0ffff',day1:'#b3ffff',day2:'#66ffff',day3:'#339999'},
+  {bg:'#ffe4e1',day1:'#ffd1d1',day2:'#ff9999',day3:'#cc3366'},
+  {bg:'#f5f5dc',day1:'#fffacd',day2:'#f0e68c',day3:'#bdb76b'},
+  {bg:'#e6e6fa',day1:'#dcdcff',day2:'#b3b3ff',day3:'#6666cc'},
+  {bg:'#fff0f5',day1:'#ffcccc',day2:'#ff6666',day3:'#cc0000'}
+];
+
+let chart;
 
 function renderCalendar(){
-  const monthKey=`${now.getFullYear()}-${now.getMonth()}`;
-  const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
-  const firstDay=new Date(now.getFullYear(),now.getMonth(),1).getDay();
+  const monthKey = `${currentYear}-${currentMonth}`;
+  const daysInMonth = new Date(currentYear, currentMonth+1, 0).getDate();
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
   calendar.innerHTML='';
-  monthYear.textContent=now.toLocaleString('pt-BR',{month:'long',year:'numeric'});
+  monthYear.textContent=new Date(currentYear, currentMonth).toLocaleString('pt-BR',{month:'long',year:'numeric'});
+  const theme = monthThemes[currentMonth];
+  document.body.style.backgroundColor = theme.bg;
   if(!markedDays[monthKey]) markedDays[monthKey]={};
+
   for(let b=0;b<firstDay;b++){ calendar.appendChild(document.createElement('div')); }
+
   for(let i=1;i<=daysInMonth;i++){
-    const day=document.createElement('div');
-    day.className="day";
-    const count=markedDays[monthKey][i]||0;
-    day.textContent=count>0?`🔥 ${count}`:i;
-    day.addEventListener('click',()=>{
-      markedDays[monthKey][i]=(markedDays[monthKey][i]||0)+1;
-      localStorage.setItem('markedDays',JSON.stringify(markedDays));
+    const dayContainer = document.createElement('div');
+    dayContainer.style.display='flex';
+    dayContainer.style.flexDirection='column';
+    dayContainer.style.alignItems='center';
+
+    const day = document.createElement('div');
+    day.classList.add('day');
+    const count = markedDays[monthKey][i]?.count||0;
+    day.textContent = count>0?`${emojiConfig[Math.min(count,3)]} ${count}`:i;
+    if(count===1) day.style.backgroundColor=theme.day1;
+    else if(count===2) day.style.backgroundColor=theme.day2;
+    else if(count>=3) day.style.backgroundColor=theme.day3;
+
+    day.addEventListener('click', ()=>{
+      if(!markedDays[monthKey][i]) markedDays[monthKey][i]={count:0};
+      markedDays[monthKey][i].count += 1;
+      localStorage.setItem('markedDays', JSON.stringify(markedDays));
       renderCalendar();
     });
-    calendar.appendChild(day);
+
+    dayContainer.appendChild(day);
+
+    const delBtn = document.createElement('button');
+    delBtn.className='delete-btn';
+    delBtn.textContent='Apagar';
+    delBtn.addEventListener('click', ()=>{
+      markedDays[monthKey][i]={count:0};
+      localStorage.setItem('markedDays', JSON.stringify(markedDays));
+      renderCalendar();
+    });
+    dayContainer.appendChild(delBtn);
+
+    calendar.appendChild(dayContainer);
   }
+
+  renderStats();
+  renderRecompensa();
+  renderChart();
 }
-document.getElementById('prevMonth').onclick=()=>{now.setMonth(now.getMonth()-1);renderCalendar();};
-document.getElementById('nextMonth').onclick=()=>{now.setMonth(now.getMonth()+1);renderCalendar();};
+
+function renderStats(){
+  const monthKey = `${currentYear}-${currentMonth}`;
+  const daysMarked = markedDays[monthKey]?Object.values(markedDays[monthKey]).filter(d=>d.count>0).length:0;
+  const totalCount = markedDays[monthKey]?Object.values(markedDays[monthKey]).reduce((sum,d)=>sum.count||0,0):0;
+  stats.textContent=`Dias marcados: ${daysMarked} | Total de vezes: ${totalCount}`;
+}
+
+function renderRecompensa(){
+  const monthKey = `${currentYear}-${currentMonth}`;
+  const totalCount = markedDays[monthKey]?Object.values(markedDays[monthKey]).reduce((sum,d)=>sum.count||0,0):0;
+  if(totalCount>=15) recompensa.textContent="🎉 Vocês podem escolher qualquer coisa!";
+  else if(totalCount>=10) recompensa.textContent="🎉 Saída para lugar de escolha do casal!";
+  else if(totalCount>=5) recompensa.textContent="🍦 Recompensa: o que o parceiro escolher!";
+  else recompensa.textContent="Sem recompensa este mês, bora tentar mais!";
+}
+
+function renderChart(){
+  const monthKey = `${currentYear}-${currentMonth}`;
+  const daysInMonth = new Date(currentYear, currentMonth+1,0).getDate();
+  const data = [];
+  for(let i=1;i<=daysInMonth;i++){
+    data.push(markedDays[monthKey][i]?.count||0);
+  }
+  if(chart) chart.destroy();
+  chart = new Chart(chartCanvas, {
+    type:'bar',
+    data:{
+      labels: Array.from({length:daysInMonth}, (_,i)=>i+1),
+      datasets:[{
+        label:'Vezes no dia',
+        data:data,
+        backgroundColor:'#cc0000'
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      scales:{ y:{beginAtZero:true, stepSize:1} }
+    }
+  });
+}
+
+prevMonthBtn.addEventListener('click',()=>{currentMonth--; if(currentMonth<0){currentMonth=11; currentYear--;} renderCalendar();});
+nextMonthBtn.addEventListener('click',()=>{currentMonth++; if(currentMonth>11){currentMonth=0; currentYear++;} renderCalendar();});
+
 renderCalendar();
 </script>
 </body>
