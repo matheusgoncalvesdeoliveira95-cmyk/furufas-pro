@@ -10,22 +10,21 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-  body { font-family: Arial,sans-serif; text-align:center; margin:5px; }
-  h1 { color:#ff1493; font-size:24px; margin-bottom:5px; }
-  #stats, #recompensa { font-size:16px; margin-bottom:5px; }
-  .calendar-header { display:flex; justify-content:center; gap:10px; margin-bottom:5px; }
-  button { padding:4px 8px; border:none; border-radius:5px; background:#ff69b4; color:white; font-size:12px; }
-  .calendar { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; justify-items:center; }
-  .day { width:50px; height:50px; line-height:50px; border-radius:50%; border:1px solid #ff69b4;
-         cursor:pointer; transition:0.3s; font-size:14px; display:flex; justify-content:center;
-         align-items:center; flex-direction:column; position:relative; }
-  .day-marked-1 { background:#ffc0cb; color:#ff1493; animation: pulse 1s infinite; }
-  .day-marked-2 { background:#ff69b4; color:white; animation: pulse 1s infinite alternate; }
-  .day-marked-3 { background:#c71585; color:white; animation: pulse 0.8s infinite alternate; }
-  @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
-  .note { display:none; font-size:10px; color:#222; margin-top:2px; background:#fff8f0; padding:2px 3px; border-radius:3px; position:absolute; top:-25px; z-index:10; box-shadow:0 1px 3px rgba(0,0,0,0.3); }
-  .day.has-note:hover .note, .day.has-note.touch-show .note { display:block; }
-  canvas { max-width: 100%; margin-top:10px; }
+body { font-family: Arial,sans-serif; text-align:center; margin:5px; transition: background-color 0.5s;}
+h1 { color:#ff1493; font-size:24px; margin-bottom:5px; }
+#stats, #recompensa { font-size:16px; margin-bottom:5px; }
+.calendar-header { display:flex; justify-content:center; gap:10px; margin-bottom:5px; }
+button { padding:6px 10px; border:none; border-radius:5px; background:#ff69b4; color:white; font-size:14px; }
+.calendar { display:grid; grid-template-columns:repeat(7,1fr); gap:10px; justify-items:center; }
+.day { width:60px; height:60px; line-height:60px; border-radius:50%; border:1px solid #ff69b4;
+       cursor:pointer; transition:0.3s; font-size:14px; display:flex; justify-content:center;
+       align-items:center; flex-direction:column; position:relative; }
+.day-marked-1, .day-marked-2, .day-marked-3 { animation: pop 0.3s ease; }
+@keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.2); } 100% { transform: scale(1); } }
+.note { display:none; font-size:10px; color:#222; margin-top:2px; background:#fff8f0; padding:2px 3px; border-radius:3px; position:absolute; top:-25px; z-index:10; box-shadow:0 1px 3px rgba(0,0,0,0.3); }
+.day.has-note:hover .note, .day.has-note.touch-show .note { display:block; }
+.delete-btn { margin-top:6px; font-size:12px; padding:2px 4px; }
+canvas { max-width: 100%; margin-top:10px; }
 </style>
 </head>
 <body>
@@ -40,9 +39,26 @@
 </div>
 <div class="calendar" id="calendar"></div>
 <canvas id="chartDays" height="100"></canvas>
+<audio id="sound" src="pop.mp3" preload="auto"></audio>
 
 <script>
 if('serviceWorker' in navigator){navigator.serviceWorker.register('service-worker.js');}
+
+let emojiConfig = {1:'🍑💦',2:'🍑🔥',3:'💥🍆'};
+let monthThemes = [
+  {bg:'#fff0f5',day1:'#ffc0cb',day2:'#ff69b4',day3:'#c71585'},
+  {bg:'#ffe4e1',day1:'#ffd1d1',day2:'#ff9999',day3:'#cc3366'},
+  {bg:'#ffe4b5',day1:'#ffecb3',day2:'#ffc107',day3:'#ff9800'},
+  {bg:'#e6e6fa',day1:'#dcdcff',day2:'#b3b3ff',day3:'#6666cc'},
+  {bg:'#f0fff0',day1:'#d0ffd0',day2:'#90ee90',day3:'#339933'},
+  {bg:'#f5f5dc',day1:'#fffacd',day2:'#f0e68c',day3:'#bdb76b'},
+  {bg:'#fafad2',day1:'#ffffe0',day2:'#ffff99',day3:'#cccc66'},
+  {bg:'#e0ffff',day1:'#b3ffff',day2:'#66ffff',day3:'#339999'},
+  {bg:'#ffe4e1',day1:'#ffd1d1',day2:'#ff9999',day3:'#cc3366'},
+  {bg:'#f5f5dc',day1:'#fffacd',day2:'#f0e68c',day3:'#bdb76b'},
+  {bg:'#e6e6fa',day1:'#dcdcff',day2:'#b3b3ff',day3:'#6666cc'},
+  {bg:'#fff0f5',day1:'#ffc0cb',day2:'#ff69b4',day3:'#c71585'}
+];
 
 const calendar=document.getElementById('calendar');
 const stats=document.getElementById('stats');
@@ -51,30 +67,18 @@ const monthYear=document.getElementById('monthYear');
 const prevMonthBtn=document.getElementById('prevMonth');
 const nextMonthBtn=document.getElementById('nextMonth');
 const chartCanvas = document.getElementById('chartDays');
+const sound = document.getElementById('sound');
 
 let now=new Date();
 let markedDays=JSON.parse(localStorage.getItem('markedDays'))||{};
-let chart=null;
-
-function getEmoji(count){
-  if(count===1) return '🍑💦';
-  else if(count===2) return '🍑🔥';
-  else if(count>=3) return '💥🍆';
-  else return '';
-}
-
-function getMonthColor(month){
-  const colors=["#fff0f5","#ffe4e1","#ffe4b5","#e6e6fa","#f0fff0","#f5f5dc","#fafad2","#e0ffff","#ffe4e1","#f5f5dc","#e6e6fa","#fff0f5"];
-  return colors[month]||"#fff0f5";
-}
 
 function renderCalendar(){
   const monthKey=`${now.getFullYear()}-${now.getMonth()}`;
   const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
   calendar.innerHTML='';
   monthYear.textContent=now.toLocaleString('pt-BR',{month:'long',year:'numeric'});
-  document.body.style.backgroundColor = getMonthColor(now.getMonth());
-
+  const theme = monthThemes[now.getMonth()];
+  document.body.style.backgroundColor = theme.bg;
   if(!markedDays[monthKey]) markedDays[monthKey]={};
 
   for(let i=1;i<=daysInMonth;i++){
@@ -82,8 +86,7 @@ function renderCalendar(){
     day.classList.add('day');
     const count=markedDays[monthKey][i]?.count||0;
     const noteText=markedDays[monthKey][i]?.note||'';
-
-    day.textContent=count>0?`${getEmoji(count)} ${count}`:i;
+    day.textContent=count>0?`${emojiConfig[Math.min(count,3)]} ${count}`:i;
 
     if(noteText) {
       day.classList.add('has-note');
@@ -93,14 +96,13 @@ function renderCalendar(){
       day.appendChild(noteDiv);
     }
 
-    if(count===1) day.classList.add('day-marked-1');
-    else if(count===2) day.classList.add('day-marked-2');
-    else if(count>=3) day.classList.add('day-marked-3');
+    if(count===1) day.style.backgroundColor=theme.day1;
+    else if(count===2) day.style.backgroundColor=theme.day2;
+    else if(count>=3) day.style.backgroundColor=theme.day3;
 
     const btn = document.createElement('button');
     btn.textContent = "Apagar";
-    btn.style.fontSize="10px";
-    btn.style.marginTop="2px";
+    btn.className = "delete-btn";
     btn.addEventListener('click', (e)=>{
       e.stopPropagation();
       markedDays[monthKey][i] = {count:0,note:""};
@@ -109,37 +111,17 @@ function renderCalendar(){
     });
     day.appendChild(btn);
 
-    let timer,longPress=false;
-    day.addEventListener('touchstart',()=>{
-      longPress=false;
-      timer=setTimeout(()=>{
-        longPress=true;
-        day.classList.add('touch-show');
-        const note=prompt(`Nota para dia ${i}:`,noteText);
-        if(!markedDays[monthKey][i]) markedDays[monthKey][i]={count:0,note:""};
-        markedDays[monthKey][i].note=note||"";
-        localStorage.setItem('markedDays',JSON.stringify(markedDays));
-        renderCalendar();
-      },500);
-    });
-    day.addEventListener('touchend',(e)=>{
-      clearTimeout(timer);
-      day.classList.remove('touch-show');
-      if(!longPress){
-        if(e.detail===2) markedDays[monthKey][i]={count:0,note:""};
-        else{
-          if(!markedDays[monthKey][i]) markedDays[monthKey][i]={count:0,note:""};
-          markedDays[monthKey][i].count+=1;
-        }
-        localStorage.setItem('markedDays',JSON.stringify(markedDays));
-        renderCalendar();
-      }
+    day.addEventListener('click',()=>{
+      if(!markedDays[monthKey][i]) markedDays[monthKey][i]={count:0,note:""};
+      markedDays[monthKey][i].count+=1;
+      sound.play();
+      localStorage.setItem('markedDays', JSON.stringify(markedDays));
+      renderCalendar();
     });
 
     calendar.appendChild(day);
   }
 
-  // Botão zerar mês
   let resetBtn = document.getElementById('resetMonthBtn');
   if(!resetBtn){
     resetBtn = document.createElement('button');
@@ -155,7 +137,6 @@ function renderCalendar(){
   }
 
   renderStats();
-  renderChart(daysInMonth);
   renderRecompensa();
 }
 
@@ -174,31 +155,12 @@ function renderRecompensa(){
   else if(totalCount>=10) recompensaMsg="🎉 Saída para lugar de escolha do casal!";
   else if(totalCount>=5) recompensaMsg="🍦 Recompensa: o que o parceiro escolher!";
   else recompensaMsg="Sem recompensa este mês, bora tentar mais!";
-  let recDiv=document.getElementById('recompensa');
-  recDiv.textContent = recompensaMsg;
+  recompensa.textContent = recompensaMsg;
 }
-
-function renderChart(daysInMonth){
-  const monthKey=`${now.getFullYear()}-${now.getMonth()}`;
-  const data=[];
-  for(let i=1;i<=daysInMonth;i++){
-    data.push(markedDays[monthKey][i]?.count||0);
-  }
-  if(chart) chart.destroy();
-  chart = new Chart(chartCanvas, {
-    type: 'bar',
-    data: {
-      labels: Array.from({length:daysInMonth},(_,i)=>i+1),
-      datasets: [{label:'Vezes',data:data,backgroundColor:'#ff69b4'}]
-    },
-    options: {scales:{y:{beginAtZero:true,stepSize:1}}}
-  });
-}
-
-prevMonthBtn.addEventListener('click',()=>{now.setMonth(now.getMonth()-1);renderCalendar();});
-nextMonthBtn.addEventListener('click',()=>{now.setMonth(now.getMonth()+1);renderCalendar();});
 
 renderCalendar();
+prevMonthBtn.addEventListener('click',()=>{now.setMonth(now.getMonth()-1);renderCalendar();});
+nextMonthBtn.addEventListener('click',()=>{now.setMonth(now.getMonth()+1);renderCalendar();});
 </script>
 </body>
 </html>
