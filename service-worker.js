@@ -1,8 +1,11 @@
-const cacheName="furufas-cache-v7";
-const filesToCache=["index.html","manifest.json"];
-self.addEventListener("install", e=>{
-  e.waitUntil(caches.open(cacheName).then(cache=>cache.addAll(filesToCache)));
+const cacheName="furufas-cache-v61b";
+self.addEventListener("install",e=>{
+  e.waitUntil(
+    caches.open(cacheName).then(c=>c.addAll(["index.html"]))
+  )
 });
-self.addEventListener("fetch", e=>{
-  e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));
+self.addEventListener("fetch",e=>{
+  e.respondWith(
+    caches.match(e.request).then(r=>r||fetch(e.request))
+  )
 });
