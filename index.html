@@ -129,7 +129,11 @@ function renderCalendar(){
   }
 
   // Botão zerar mês
-  let resetBtn = document.createElement('button');
+  // Botão zerar mês (criar apenas uma vez)
+let resetBtn = document.getElementById('resetMonthBtn');
+if(!resetBtn){
+  resetBtn = document.createElement('button');
+  resetBtn.id = 'resetMonthBtn';
   resetBtn.textContent = "Zerar Mês";
   resetBtn.style.margin = "5px";
   resetBtn.addEventListener('click', ()=>{
@@ -138,6 +142,8 @@ function renderCalendar(){
     renderCalendar();
   });
   calendar.parentNode.insertBefore(resetBtn, calendar);
+}
+
 
   renderStats();
 }
