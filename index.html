@@ -12,7 +12,7 @@
 <style>
   body { font-family: Arial,sans-serif; text-align:center; margin:5px; }
   h1 { color:#ff1493; font-size:24px; margin-bottom:5px; }
-  #stats { font-size:16px; margin-bottom:5px; }
+  #stats, #recompensa { font-size:16px; margin-bottom:5px; }
   .calendar-header { display:flex; justify-content:center; gap:10px; margin-bottom:5px; }
   button { padding:4px 8px; border:none; border-radius:5px; background:#ff69b4; color:white; font-size:12px; }
   .calendar { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; justify-items:center; }
@@ -32,6 +32,7 @@
 
 <h1>Furufas Pro</h1>
 <div id="stats"></div>
+<div id="recompensa"></div>
 <div class="calendar-header">
   <button id="prevMonth">&lt;</button>
   <div id="monthYear"></div>
@@ -45,6 +46,7 @@ if('serviceWorker' in navigator){navigator.serviceWorker.register('service-worke
 
 const calendar=document.getElementById('calendar');
 const stats=document.getElementById('stats');
+const recompensa=document.getElementById('recompensa');
 const monthYear=document.getElementById('monthYear');
 const prevMonthBtn=document.getElementById('prevMonth');
 const nextMonthBtn=document.getElementById('nextMonth');
@@ -154,6 +156,7 @@ function renderCalendar(){
 
   renderStats();
   renderChart(daysInMonth);
+  renderRecompensa();
 }
 
 function renderStats(){
@@ -161,6 +164,18 @@ function renderStats(){
   const daysMarked=markedDays[monthKey]?Object.values(markedDays[monthKey]).filter(d=>d.count>0).length:0;
   const totalCount=markedDays[monthKey]?Object.values(markedDays[monthKey]).reduce((sum,d)=>sum+(d.count||0),0):0;
   stats.textContent=`Dias marcados: ${daysMarked} | Total de vezes: ${totalCount}`;
+}
+
+function renderRecompensa(){
+  const monthKey=`${now.getFullYear()}-${now.getMonth()}`;
+  const totalCount=markedDays[monthKey]?Object.values(markedDays[monthKey]).reduce((sum,d)=>sum+(d.count||0),0):0;
+  let recompensaMsg='';
+  if(totalCount>=15) recompensaMsg="🎉 Vocês podem escolher qualquer coisa!";
+  else if(totalCount>=10) recompensaMsg="🎉 Saída para lugar de escolha do casal!";
+  else if(totalCount>=5) recompensaMsg="🍦 Recompensa: o que o parceiro escolher!";
+  else recompensaMsg="Sem recompensa este mês, bora tentar mais!";
+  let recDiv=document.getElementById('recompensa');
+  recDiv.textContent = recompensaMsg;
 }
 
 function renderChart(daysInMonth){
