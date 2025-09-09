@@ -8,22 +8,24 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Furufas">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
-  body { font-family: Arial,sans-serif; text-align:center; margin:5px; background:#fff0f5; color:#333; }
+  body { font-family: Arial,sans-serif; text-align:center; margin:5px; }
   h1 { color:#ff1493; font-size:24px; margin-bottom:5px; }
   #stats { font-size:16px; margin-bottom:5px; }
   .calendar-header { display:flex; justify-content:center; gap:10px; margin-bottom:5px; }
-  button { padding:8px 12px; border:none; border-radius:5px; background:#ff69b4; color:white; font-size:16px; }
+  button { padding:4px 8px; border:none; border-radius:5px; background:#ff69b4; color:white; font-size:12px; }
   .calendar { display:grid; grid-template-columns:repeat(7,1fr); gap:5px; justify-items:center; }
   .day { width:50px; height:50px; line-height:50px; border-radius:50%; border:1px solid #ff69b4;
          cursor:pointer; transition:0.3s; font-size:14px; display:flex; justify-content:center;
-         align-items:center; flex-direction:column; user-select:none; position:relative; }
+         align-items:center; flex-direction:column; position:relative; }
   .day-marked-1 { background:#ffc0cb; color:#ff1493; animation: pulse 1s infinite; }
   .day-marked-2 { background:#ff69b4; color:white; animation: pulse 1s infinite alternate; }
   .day-marked-3 { background:#c71585; color:white; animation: pulse 0.8s infinite alternate; }
   @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
   .note { display:none; font-size:10px; color:#222; margin-top:2px; background:#fff8f0; padding:2px 3px; border-radius:3px; position:absolute; top:-25px; z-index:10; box-shadow:0 1px 3px rgba(0,0,0,0.3); }
   .day.has-note:hover .note, .day.has-note.touch-show .note { display:block; }
+  canvas { max-width: 100%; margin-top:10px; }
 </style>
 </head>
 <body>
@@ -36,6 +38,7 @@
   <button id="nextMonth">&gt;</button>
 </div>
 <div class="calendar" id="calendar"></div>
+<canvas id="chartDays" height="100"></canvas>
 
 <script>
 if('serviceWorker' in navigator){navigator.serviceWorker.register('service-worker.js');}
@@ -45,9 +48,11 @@ const stats=document.getElementById('stats');
 const monthYear=document.getElementById('monthYear');
 const prevMonthBtn=document.getElementById('prevMonth');
 const nextMonthBtn=document.getElementById('nextMonth');
+const chartCanvas = document.getElementById('chartDays');
 
 let now=new Date();
 let markedDays=JSON.parse(localStorage.getItem('markedDays'))||{};
+let chart=null;
 
 function getEmoji(count){
   if(count===1) return '🍑💦';
@@ -56,11 +61,18 @@ function getEmoji(count){
   else return '';
 }
 
+function getMonthColor(month){
+  const colors=["#fff0f5","#ffe4e1","#ffe4b5","#e6e6fa","#f0fff0","#f5f5dc","#fafad2","#e0ffff","#ffe4e1","#f5f5dc","#e6e6fa","#fff0f5"];
+  return colors[month]||"#fff0f5";
+}
+
 function renderCalendar(){
   const monthKey=`${now.getFullYear()}-${now.getMonth()}`;
   const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
   calendar.innerHTML='';
   monthYear.textContent=now.toLocaleString('pt-BR',{month:'long',year:'numeric'});
+  document.body.style.backgroundColor = getMonthColor(now.getMonth());
+
   if(!markedDays[monthKey]) markedDays[monthKey]={};
 
   for(let i=1;i<=daysInMonth;i++){
@@ -79,25 +91,22 @@ function renderCalendar(){
       day.appendChild(noteDiv);
     }
 
-    // cores animadas
     if(count===1) day.classList.add('day-marked-1');
     else if(count===2) day.classList.add('day-marked-2');
     else if(count>=3) day.classList.add('day-marked-3');
 
-    // Botão apagar dia
     const btn = document.createElement('button');
     btn.textContent = "Apagar";
     btn.style.fontSize="10px";
     btn.style.marginTop="2px";
     btn.addEventListener('click', (e)=>{
-      e.stopPropagation(); // não ativa toque normal
+      e.stopPropagation();
       markedDays[monthKey][i] = {count:0,note:""};
       localStorage.setItem('markedDays', JSON.stringify(markedDays));
       renderCalendar();
     });
     day.appendChild(btn);
 
-    // Toque curto/longo
     let timer,longPress=false;
     day.addEventListener('touchstart',()=>{
       longPress=false;
@@ -129,23 +138,22 @@ function renderCalendar(){
   }
 
   // Botão zerar mês
-  // Botão zerar mês (criar apenas uma vez)
-let resetBtn = document.getElementById('resetMonthBtn');
-if(!resetBtn){
-  resetBtn = document.createElement('button');
-  resetBtn.id = 'resetMonthBtn';
-  resetBtn.textContent = "Zerar Mês";
-  resetBtn.style.margin = "5px";
-  resetBtn.addEventListener('click', ()=>{
-    markedDays[monthKey] = {};
-    localStorage.setItem('markedDays', JSON.stringify(markedDays));
-    renderCalendar();
-  });
-  calendar.parentNode.insertBefore(resetBtn, calendar);
-}
-
+  let resetBtn = document.getElementById('resetMonthBtn');
+  if(!resetBtn){
+    resetBtn = document.createElement('button');
+    resetBtn.id = 'resetMonthBtn';
+    resetBtn.textContent = "Zerar Mês";
+    resetBtn.style.margin = "5px";
+    resetBtn.addEventListener('click', ()=>{
+      markedDays[monthKey] = {};
+      localStorage.setItem('markedDays', JSON.stringify(markedDays));
+      renderCalendar();
+    });
+    calendar.parentNode.insertBefore(resetBtn, calendar);
+  }
 
   renderStats();
+  renderChart(daysInMonth);
 }
 
 function renderStats(){
@@ -153,6 +161,23 @@ function renderStats(){
   const daysMarked=markedDays[monthKey]?Object.values(markedDays[monthKey]).filter(d=>d.count>0).length:0;
   const totalCount=markedDays[monthKey]?Object.values(markedDays[monthKey]).reduce((sum,d)=>sum+(d.count||0),0):0;
   stats.textContent=`Dias marcados: ${daysMarked} | Total de vezes: ${totalCount}`;
+}
+
+function renderChart(daysInMonth){
+  const monthKey=`${now.getFullYear()}-${now.getMonth()}`;
+  const data=[];
+  for(let i=1;i<=daysInMonth;i++){
+    data.push(markedDays[monthKey][i]?.count||0);
+  }
+  if(chart) chart.destroy();
+  chart = new Chart(chartCanvas, {
+    type: 'bar',
+    data: {
+      labels: Array.from({length:daysInMonth},(_,i)=>i+1),
+      datasets: [{label:'Vezes',data:data,backgroundColor:'#ff69b4'}]
+    },
+    options: {scales:{y:{beginAtZero:true,stepSize:1}}}
+  });
 }
 
 prevMonthBtn.addEventListener('click',()=>{now.setMonth(now.getMonth()-1);renderCalendar();});
